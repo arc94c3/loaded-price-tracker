@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS launchd agent for loaded.com price monitor.
+  Install: cp examples/com.loaded.price-monitor.plist ~/Library/LaunchAgents/
+           launchctl load ~/Library/LaunchAgents/com.loaded.price-monitor.plist
+  Edit paths and env vars below to match your install.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.loaded.price-monitor</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/YOUR_USER/loaded-price-tracker</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/YOUR_USER/loaded-price-tracker/rust/target/release/loaded-rs</string>
+        <string>--no-banner</string>
+        <string>check</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DISCORD_WEBHOOK_URL</key>
+        <string></string>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string></string>
+        <key>TELEGRAM_CHAT_ID</key>
+        <string></string>
+    </dict>
+
+    <!-- Run every 6 hours (21600 seconds). -->
+    <key>StartInterval</key>
+    <integer>21600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/YOUR_USER/loaded-price-tracker/run.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/YOUR_USER/loaded-price-tracker/run.log</string>
+</dict>
+</plist>

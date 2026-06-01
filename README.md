@@ -5,8 +5,10 @@ notifications when prices change. Three implementations — **Python**, **Rust**
 and **Go** — sharing the same `products.json` config and `history.json` state
 files, so you can switch freely between them.
 
-> **New user?** See [GETTING_STARTED.md](GETTING_STARTED.md) for a friendly,
-> click-by-click setup guide. The rest of this README is the reference.
+> **New user?** See [GETTING_STARTED.md](GETTING_STARTED.md) — pick between
+> [hosting on GitHub Actions](GETTING_STARTED_GITHUB.md) or
+> [hosting locally on a Pi / NAS / laptop](GETTING_STARTED_LOCAL.md). The rest
+> of this README is the reference.
 
 ```
   ██╗      ██████╗  █████╗ ██████╗ ███████╗██████╗
@@ -15,7 +17,13 @@ files, so you can switch freely between them.
   ██║     ██║   ██║██╔══██║██║  ██║██╔══╝  ██║  ██║
   ███████╗╚██████╔╝██║  ██║██████╔╝███████╗██████╔╝
   ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═════╝
-    price monitor
+  ██████╗ ██████╗ ██╗ ██████╗███████╗    ███╗   ███╗ ██████╗ ███╗   ██╗██╗████████╗ ██████╗ ██████╗
+  ██╔══██╗██╔══██╗██║██╔════╝██╔════╝    ████╗ ████║██╔═══██╗████╗  ██║██║╚══██╔══╝██╔═══██╗██╔══██╗
+  ██████╔╝██████╔╝██║██║     █████╗      ██╔████╔██║██║   ██║██╔██╗ ██║██║   ██║   ██║   ██║██████╔╝
+  ██╔═══╝ ██╔══██╗██║██║     ██╔══╝      ██║╚██╔╝██║██║   ██║██║╚██╗██║██║   ██║   ██║   ██║██╔══██╗
+  ██║     ██║  ██║██║╚██████╗███████╗    ██║ ╚═╝ ██║╚██████╔╝██║ ╚████║██║   ██║   ╚██████╔╝██║  ██║
+  ╚═╝     ╚═╝  ╚═╝╚═╝ ╚═════╝╚══════╝    ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
+  > track game key prices on loaded.com
 ```
 
 ## Layout
@@ -151,8 +159,13 @@ works fine.
 | Run all checks | `python -m src.main check` | `loaded-rs check` | `loaded-go check` |
 | Dry run | `... check --dry-run` | `... check --dry-run` | `... check --dry-run` |
 | One product | `... check --product <id>` | `... check --product <id>` | `... check --product <id>` |
+| Watch loop | `... check --watch --interval 360` | `... check --watch --interval 360` | `... check --watch --interval 360` |
 | Add product | `... add --url ... --name ...` | `... add --url ... --name ...` | `... add --url ... --name ...` |
 | Suppress banner | `--no-banner` | `--no-banner` | `--no-banner` |
+
+`--watch` runs `check` on a loop, sleeping `--interval` minutes between runs
+(default 360 = 6h). Useful when self-hosting without cron/systemd — see
+[GETTING_STARTED_LOCAL.md](GETTING_STARTED_LOCAL.md).
 
 ## GitHub Actions setup
 
@@ -232,8 +245,12 @@ to your friend along with a `products.json`. They can run it on a schedule with
 Windows Task Scheduler / cron — no Python, no toolchain needed.
 
 ## Local-only mode
-None of the implementations require GitHub Actions. Just run `check` whenever
-you want; `history.json` is updated on disk and stays local.
+You don't need GitHub Actions at all. Every implementation has a `--watch`
+flag for self-hosted scheduling, and `examples/` contains ready-to-use
+systemd, cron, launchd, and Windows Task Scheduler templates.
+
+See **[GETTING_STARTED_LOCAL.md](GETTING_STARTED_LOCAL.md)** for the full
+Raspberry Pi / NAS / laptop walkthrough.
 
 ## Files
 
@@ -241,6 +258,8 @@ you want; `history.json` is updated on disk and stays local.
 - `history.json` — price history + per-rule arm state (committed by the Action)
 - `python/`, `rust/`, `go/` — three implementations of the same tool
 - `.github/workflows/check-prices.yml` — cron-driven Python runner
+- `examples/` — systemd, cron, launchd, and Windows Task Scheduler templates
+  for self-hosting
 
 ## Notes
 

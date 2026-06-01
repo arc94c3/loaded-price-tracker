@@ -29,6 +29,12 @@ enum Cmd {
         /// Check only a single product by id
         #[arg(long)]
         product: Option<String>,
+        /// Run continuously, repeating every --interval minutes
+        #[arg(long)]
+        watch: bool,
+        /// Minutes between checks when --watch is set (default: 360 = 6h)
+        #[arg(long, default_value_t = 360)]
+        interval: u64,
     },
     /// Add a product to the tracker
     Add {
@@ -104,6 +110,16 @@ fn parse_rule(spec: &str) -> Result<config::Rule> {
             Ok(config::Rule::PercentDrop { min_percent: parts[1].parse()? })
         }
         other => Err(anyhow!("Unknown rule type: {other}")),
+    }
+}
+
+fn cmd_check_watch(dry_run: bool, product_filter: Option<String>, interval_min: u64) -> Result<i32> {
+    let interval = Duration::from_secs(interval_min.max(1) * 60);
+    println!("Watch mode: checking every {} minute(s). Ctrl-C to stop.", interval_min);
+    loop {
+        let _ = cmd_check(dry_run, product_filter.clone())?;
+        println!("Next check in {} minute(s).", interval_min);
+        thread::sleep(interval);
     }
 }
 
@@ -253,8 +269,14 @@ fn main() -> Result<()> {
         banner::print_banner(false);
     }
 
-    let code = match cli.command.unwrap_or(Cmd::Check { dry_run: false, product: None }) {
-        Cmd::Check { dry_run, product } => cmd_check(dry_run, product)?,
+    let code = match cli.command.unwrap_or(Cmd::Check { dry_run: false, product: None, watch: false, interval: 360 }) {
+        Cmd::Check { dry_run, product, watch, interval } => {
+            if watch {
+                cmd_check_watch(dry_run, product, interval)?
+            } else {
+                cmd_check(dry_run, product)?
+            }
+        }
         Cmd::Add { url, name, tags, rule } => cmd_add(url, name, tags, rule)?,
     };
     std::process::exit(code);

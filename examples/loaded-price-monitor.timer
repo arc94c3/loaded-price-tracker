@@ -1,0 +1,12 @@
+[Unit]
+Description=Run loaded.com price monitor every 6 hours
+Documentation=https://github.com/arc94c3/loaded-price-tracker
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+Persistent=true
+Unit=loaded-price-monitor.service
+
+[Install]
+WantedBy=timers.target

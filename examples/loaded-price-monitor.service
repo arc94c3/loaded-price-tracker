@@ -1,0 +1,28 @@
+[Unit]
+Description=Loaded.com price monitor (one-shot check)
+Documentation=https://github.com/arc94c3/loaded-price-tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/loaded-price-tracker
+EnvironmentFile=%h/.config/loaded-price-monitor.env
+
+# Pick ONE of the ExecStart lines — comment out the others.
+
+# Python:
+ExecStart=%h/loaded-price-tracker/python/.venv/bin/python -m src.main --no-banner check
+# Rust:
+# ExecStart=%h/loaded-price-tracker/rust/target/release/loaded-rs --no-banner check
+# Go:
+# ExecStart=%h/loaded-price-tracker/loaded-go --no-banner check
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/loaded-price-tracker
+ProtectHome=read-only
+
+[Install]
+WantedBy=default.target

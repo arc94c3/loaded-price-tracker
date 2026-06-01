@@ -49,6 +49,26 @@ def _secrets():
 
 
 def cmd_check(args: argparse.Namespace) -> int:
+    if getattr(args, "watch", False):
+        return _watch_loop(args)
+    return _check_once(args)
+
+
+def _watch_loop(args: argparse.Namespace) -> int:
+    interval_sec = max(1, args.interval) * 60
+    log.info("Watch mode: checking every %d minute(s). Ctrl-C to stop.", args.interval)
+    last_rc = 0
+    try:
+        while True:
+            last_rc = _check_once(args)
+            log.info("Next check in %d minute(s).", args.interval)
+            time.sleep(interval_sec)
+    except KeyboardInterrupt:
+        log.info("Watch stopped.")
+        return last_rc
+
+
+def _check_once(args: argparse.Namespace) -> int:
     try:
         products = load_config(PRODUCTS_PATH)
     except ConfigError as e:
@@ -195,6 +215,14 @@ def build_parser() -> argparse.ArgumentParser:
     check = sub.add_parser("check", help="Check all tracked products (default)")
     check.add_argument("--dry-run", action="store_true", help="Don't send or persist anything")
     check.add_argument("--product", help="Check a single product by id")
+    check.add_argument(
+        "--watch", action="store_true",
+        help="Run continuously, repeating every --interval minutes",
+    )
+    check.add_argument(
+        "--interval", type=int, default=360,
+        help="Minutes between checks when --watch is set (default: 360 = 6h)",
+    )
     check.set_defaults(func=cmd_check)
 
     add = sub.add_parser("add", help="Add a product to the tracker")

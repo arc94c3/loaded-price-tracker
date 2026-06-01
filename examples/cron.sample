@@ -1,0 +1,11 @@
+# Loaded price monitor — crontab sample.
+# Install with: crontab -e   (then paste a line below, with paths edited)
+
+# Every 6 hours, using the Rust binary, sourcing secrets from .env in the repo.
+0 */6 * * * cd /home/pi/loaded-price-tracker && . ./.env && ./rust/target/release/loaded-rs --no-banner check >> /home/pi/loaded-price-tracker/run.log 2>&1
+
+# Every 2 hours, using the Python venv.
+# 0 */2 * * * cd /home/pi/loaded-price-tracker/python && . ../.env && .venv/bin/python -m src.main --no-banner check >> /home/pi/loaded-price-tracker/run.log 2>&1
+
+# Every 30 minutes, using the Go binary.
+# */30 * * * * cd /home/pi/loaded-price-tracker && . ./.env && ./loaded-go --no-banner check >> /home/pi/loaded-price-tracker/run.log 2>&1
