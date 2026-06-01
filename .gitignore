@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.idea/
+.vscode/
+
+# Rust
+target/
+
+# Go
+*.exe
+loaded-go
+loaded-rs
