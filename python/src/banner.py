@@ -24,8 +24,8 @@ LINES = [
 
 TAGLINE = "  > track game key prices on loaded.com"
 
-GRADIENT_START = (0xFF, 0x2E, 0x2E)
-GRADIENT_END = (0xFF, 0xA8, 0x3C)
+GRADIENT_START = (0x22, 0xD3, 0xEE)  # cyan
+GRADIENT_END = (0xD9, 0x46, 0xEF)    # magenta
 
 
 def _color_enabled() -> bool:

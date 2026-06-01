@@ -10,6 +10,11 @@ files, so you can switch freely between them.
 > [hosting locally on a Pi / NAS / laptop](GETTING_STARTED_LOCAL.md). The rest
 > of this README is the reference.
 
+![Banner: LOADED PRICE MONITOR in cyan-to-magenta ANSI block art on a dark background](docs/banner.png)
+
+<details>
+<summary>Plain-text fallback</summary>
+
 ```
   ██╗      ██████╗  █████╗ ██████╗ ███████╗██████╗
   ██║     ██╔═══██╗██╔══██╗██╔══██╗██╔════╝██╔══██╗
@@ -25,6 +30,8 @@ files, so you can switch freely between them.
   ╚═╝     ╚═╝  ╚═╝╚═╝ ╚═════╝╚══════╝    ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
   > track game key prices on loaded.com
 ```
+
+</details>
 
 ## Layout
 

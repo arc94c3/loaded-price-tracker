@@ -18,8 +18,9 @@ pub const LINES: [&str; 12] = [
 
 pub const TAGLINE: &str = "  > track game key prices on loaded.com";
 
-const GRADIENT_START: (u8, u8, u8) = (0xFF, 0x2E, 0x2E);
-const GRADIENT_END: (u8, u8, u8) = (0xFF, 0xA8, 0x3C);
+// cyan (#22d3ee) -> magenta (#d946ef), matching khinsider-scraper
+const GRADIENT_START: (u8, u8, u8) = (0x22, 0xD3, 0xEE);
+const GRADIENT_END: (u8, u8, u8) = (0xD9, 0x46, 0xEF);
 
 fn color_enabled() -> bool {
     if std::env::var_os("NO_COLOR").is_some() {

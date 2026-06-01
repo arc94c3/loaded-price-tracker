@@ -60,9 +60,10 @@ func Print() {
 			if n > 1 {
 				t = float64(i) / float64(n-1)
 			}
-			r := lerp(0xff, 0xff, t)
-			g := lerp(0x2e, 0xa8, t)
-			b := lerp(0x2e, 0x3c, t)
+			// cyan (#22d3ee) -> magenta (#d946ef), matching khinsider-scraper
+			r := lerp(0x22, 0xd9, t)
+			g := lerp(0xd3, 0x46, t)
+			b := lerp(0xee, 0xef, t)
 			color.RGB(int(r), int(g), int(b)).Add(color.Bold).Println(line)
 		} else {
 			fmt.Println(line)
