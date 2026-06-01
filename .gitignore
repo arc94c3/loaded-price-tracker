@@ -13,7 +13,8 @@ venv/
 # Rust
 target/
 
-# Go
+# Go / Rust built binaries (root-anchored so we don't accidentally ignore
+# the go/cmd/loaded-go/ source directory)
 *.exe
-loaded-go
-loaded-rs
+/loaded-go
+/loaded-rs

@@ -3,15 +3,39 @@ use regex::Regex;
 use rust_decimal::Decimal;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use std::process::Command;
 use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
 pub const USER_AGENT: &str =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
-     (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+     (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
+// Header set that matches a real Chrome top-level navigation. loaded.com sits
+// behind Cloudflare which fingerprints the TLS handshake (JA3/JA4); reqwest's
+// rustls/native-tls handshake gets a 403 with CF-Mitigated: challenge
+// regardless of headers. Shelling out to the system `curl` binary uses
+// OpenSSL/SChannel-based handshakes that Cloudflare accepts, while keeping the
+// dependency surface minimal (curl is preinstalled on Windows 10+, macOS, and
+// virtually every Linux distro / CI runner).
+const BROWSER_HEADERS: &[(&str, &str)] = &[
+    (
+        "Accept",
+        "text/html,application/xhtml+xml,application/xml;q=0.9,\
+         image/avif,image/webp,image/apng,*/*;q=0.8",
+    ),
+    ("Accept-Language", "en-GB,en;q=0.9"),
+    ("Sec-Fetch-Site", "none"),
+    ("Sec-Fetch-Mode", "navigate"),
+    ("Sec-Fetch-User", "?1"),
+    ("Sec-Fetch-Dest", "document"),
+    ("Upgrade-Insecure-Requests", "1"),
+    ("Cache-Control", "no-cache"),
+    ("Pragma", "no-cache"),
+];
+
+const REQUEST_TIMEOUT_SECS: u64 = 20;
 const RETRY_DELAY: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone)]
@@ -20,33 +44,71 @@ pub struct PriceResult {
     pub currency: String,
 }
 
+/// Build the reqwest client used for notifier webhooks. (loaded.com fetches go
+/// through `curl` instead — see `fetch`.) We still construct a reqwest client
+/// because Discord and Telegram webhooks are not Cloudflare-fingerprinted and
+/// work fine with rustls.
 pub fn build_client() -> Result<reqwest::blocking::Client> {
+    // Probe for curl up-front so we fail with a clear message rather than on
+    // the first scrape.
+    match Command::new("curl").arg("--version").output() {
+        Ok(o) if o.status.success() => {}
+        Ok(o) => {
+            return Err(anyhow!(
+                "`curl` is required to fetch loaded.com (Cloudflare TLS fingerprinting). \
+                 `curl --version` exited with status {}",
+                o.status
+            ))
+        }
+        Err(e) => {
+            return Err(anyhow!(
+                "`curl` is required to fetch loaded.com but could not be executed: {e}. \
+                 Install curl and ensure it is on PATH."
+            ))
+        }
+    }
     reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
-        .timeout(REQUEST_TIMEOUT)
+        .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .build()
         .context("Failed to build HTTP client")
 }
 
-fn fetch(client: &reqwest::blocking::Client, url: &str) -> Result<String> {
+fn curl_once(url: &str) -> Result<String> {
+    let mut cmd = Command::new("curl");
+    cmd.arg("--silent")
+        .arg("--show-error")
+        .arg("--location")
+        .arg("--compressed")
+        .arg("--max-time")
+        .arg(REQUEST_TIMEOUT_SECS.to_string())
+        .arg("--fail-with-body")
+        .arg("--user-agent")
+        .arg(USER_AGENT);
+    for (k, v) in BROWSER_HEADERS {
+        cmd.arg("-H").arg(format!("{k}: {v}"));
+    }
+    cmd.arg(url);
+    let out = cmd.output().context("Failed to spawn `curl`")?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(anyhow!(
+            "curl exited with status {} for {url}: {}",
+            out.status,
+            stderr.trim()
+        ));
+    }
+    String::from_utf8(out.stdout).context("curl response was not valid UTF-8")
+}
+
+fn fetch(_client: &reqwest::blocking::Client, url: &str) -> Result<String> {
     let mut last_err: Option<anyhow::Error> = None;
     for attempt in 0..2 {
-        match client
-            .get(url)
-            .header("Accept", "text/html,application/xhtml+xml")
-            .header("Accept-Language", "en-GB,en;q=0.9")
-            .send()
-        {
-            Ok(resp) => match resp.error_for_status() {
-                Ok(r) => return r.text().context("Failed to read response body"),
-                Err(e) => {
-                    eprintln!("Attempt {} failed for {}: {}", attempt + 1, url, e);
-                    last_err = Some(e.into());
-                }
-            },
+        match curl_once(url) {
+            Ok(body) => return Ok(body),
             Err(e) => {
                 eprintln!("Attempt {} failed for {}: {}", attempt + 1, url, e);
-                last_err = Some(e.into());
+                last_err = Some(e);
             }
         }
         thread::sleep(RETRY_DELAY);

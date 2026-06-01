@@ -9,16 +9,44 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
-import requests
+from curl_cffi import requests
+from curl_cffi.requests.exceptions import RequestException
 from bs4 import BeautifulSoup
+
+# Cloudflare in front of loaded.com fingerprints the TLS handshake (JA3/JA4),
+# so a stock urllib3/OpenSSL client is challenged regardless of headers.
+# curl_cffi impersonates a real Chrome TLS ClientHello which passes the
+# managed challenge cleanly.
+IMPERSONATE = "chrome"
 
 log = logging.getLogger(__name__)
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/124.0.0.0 Safari/537.36"
+    "Chrome/131.0.0.0 Safari/537.36"
 )
+
+# Cloudflare in front of loaded.com challenges requests that don't look like a
+# real browser. The full set of Sec-Fetch / Upgrade-Insecure-Requests headers
+# below mirrors what Chrome sends for a top-level navigation and is enough to
+# pass the default managed challenge without solving it.
+BROWSER_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language": "en-GB,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-User": "?1",
+    "Sec-Fetch-Dest": "document",
+    "Upgrade-Insecure-Requests": "1",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+}
 
 REQUEST_TIMEOUT = 20
 RETRY_DELAY = 2.0
@@ -36,18 +64,19 @@ class PriceResult:
 
 def _fetch(url: str, session: Optional[requests.Session] = None) -> str:
     sess = session or requests.Session()
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml",
-        "Accept-Language": "en-GB,en;q=0.9",
-    }
     last_err: Optional[Exception] = None
     for attempt in range(2):
         try:
-            resp = sess.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+            resp = sess.get(
+                url,
+                headers=BROWSER_HEADERS,
+                timeout=REQUEST_TIMEOUT,
+                allow_redirects=True,
+                impersonate=IMPERSONATE,
+            )
             resp.raise_for_status()
             return resp.text
-        except requests.RequestException as e:
+        except RequestException as e:
             last_err = e
             log.warning("Fetch attempt %d failed for %s: %s", attempt + 1, url, e)
             time.sleep(RETRY_DELAY)

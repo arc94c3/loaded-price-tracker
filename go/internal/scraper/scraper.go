@@ -3,9 +3,9 @@ package scraper
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
+	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +14,26 @@ import (
 )
 
 const UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-	"(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+	"(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+// Header set matching a Chrome top-level navigation. loaded.com sits behind
+// Cloudflare which fingerprints the TLS handshake (JA3/JA4); Go's crypto/tls
+// stack is detected and gets a 403 with CF-Mitigated: challenge regardless of
+// headers. We shell out to the system `curl` binary, whose OpenSSL/SChannel
+// handshake Cloudflare accepts. curl is preinstalled on Windows 10+, macOS,
+// and virtually every Linux distro / CI runner.
+var browserHeaders = map[string]string{
+	"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9," +
+		"image/avif,image/webp,image/apng,*/*;q=0.8",
+	"Accept-Language":           "en-GB,en;q=0.9",
+	"Sec-Fetch-Site":            "none",
+	"Sec-Fetch-Mode":            "navigate",
+	"Sec-Fetch-User":            "?1",
+	"Sec-Fetch-Dest":            "document",
+	"Upgrade-Insecure-Requests": "1",
+	"Cache-Control":             "no-cache",
+	"Pragma":                    "no-cache",
+}
 
 const (
 	requestTimeout = 20 * time.Second
@@ -26,39 +45,61 @@ type PriceResult struct {
 	Currency string
 }
 
-func NewClient() *http.Client {
-	return &http.Client{Timeout: requestTimeout}
+// HTTPClient is a placeholder kept for API compatibility — fetches go through
+// `curl`. It is returned by NewClient so the rest of the codebase doesn't have
+// to change shape.
+type HTTPClient struct{}
+
+func NewClient() *HTTPClient {
+	return &HTTPClient{}
 }
 
-func fetch(client *http.Client, url string) (string, error) {
+// EnsureCurl verifies that the `curl` binary is on PATH. Callers (main) should
+// invoke this at startup so users get a clear error rather than a per-product
+// failure.
+func EnsureCurl() error {
+	out, err := exec.Command("curl", "--version").Output()
+	if err != nil {
+		return fmt.Errorf("`curl` is required to fetch loaded.com (Cloudflare TLS fingerprinting) "+
+			"but could not be executed: %w. Install curl and ensure it is on PATH", err)
+	}
+	if len(out) == 0 {
+		return fmt.Errorf("`curl --version` produced no output; install curl and ensure it is on PATH")
+	}
+	return nil
+}
+
+func curlOnce(url string) (string, error) {
+	args := []string{
+		"--silent", "--show-error", "--location", "--compressed",
+		"--max-time", strconv.Itoa(int(requestTimeout.Seconds())),
+		"--fail-with-body",
+		"--user-agent", UserAgent,
+	}
+	for k, v := range browserHeaders {
+		args = append(args, "-H", fmt.Sprintf("%s: %s", k, v))
+	}
+	args = append(args, url)
+	out, err := exec.Command("curl", args...).Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return "", fmt.Errorf("curl exited with status %d for %s: %s",
+				ee.ExitCode(), url, strings.TrimSpace(string(ee.Stderr)))
+		}
+		return "", fmt.Errorf("failed to spawn curl for %s: %w", url, err)
+	}
+	return string(out), nil
+}
+
+func fetch(_ *HTTPClient, url string) (string, error) {
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return "", err
+		body, err := curlOnce(url)
+		if err == nil {
+			return body, nil
 		}
-		req.Header.Set("User-Agent", UserAgent)
-		req.Header.Set("Accept", "text/html,application/xhtml+xml")
-		req.Header.Set("Accept-Language", "en-GB,en;q=0.9")
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			time.Sleep(retryDelay)
-			continue
-		}
-		body, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode >= 400 {
-			lastErr = fmt.Errorf("HTTP %d for %s", resp.StatusCode, url)
-			time.Sleep(retryDelay)
-			continue
-		}
-		if readErr != nil {
-			lastErr = readErr
-			time.Sleep(retryDelay)
-			continue
-		}
-		return string(body), nil
+		lastErr = err
+		time.Sleep(retryDelay)
 	}
 	return "", fmt.Errorf("failed to fetch %s: %w", url, lastErr)
 }
@@ -216,7 +257,7 @@ func parseFallback(doc *goquery.Document) *PriceResult {
 	return result
 }
 
-func ScrapePrice(client *http.Client, url string) (*PriceResult, error) {
+func ScrapePrice(client *HTTPClient, url string) (*PriceResult, error) {
 	html, err := fetch(client, url)
 	if err != nil {
 		return nil, err

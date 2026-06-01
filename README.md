@@ -100,6 +100,13 @@ go build -o loaded-go.exe -ldflags "-s -w" ./cmd/loaded-go
 > current directory, so you can run from the project root or from any
 > sub-directory.
 
+> **Cloudflare note:** Rust and Go shell out to `curl` for loaded.com fetches
+> (Python uses `curl_cffi`). `curl` is preinstalled on Windows 10+, macOS,
+> every major Linux distro, and the `ubuntu-latest` GitHub Actions runner — no
+> extra install needed in any of these environments. See
+> [docs/notes-cloudflare.md](docs/notes-cloudflare.md) for why.
+
+
 ## Notification rules
 
 Each product in `products.json` has a `notify` list. Rules are OR'd; if several
@@ -278,3 +285,10 @@ Raspberry Pi / NAS / laptop walkthrough.
   end listing failures.
 - All three write `history.json` in the same format, so switching
   implementations between runs is safe.
+- **Cloudflare**: loaded.com is behind Cloudflare which fingerprints the TLS
+  handshake. Python uses `curl_cffi` (Chrome impersonation). Rust and Go shell
+  out to the system `curl` binary for product fetches (preinstalled on Windows
+  10+, macOS, every major Linux distro, and GitHub Actions runners). See
+  [docs/notes-cloudflare.md](docs/notes-cloudflare.md) for the details and
+  escalation options.
+
